@@ -1,18 +1,28 @@
 from django.urls import include, path
-from rest_framework.routers import DefaultRouter
-from .views import PostViewSet, GroupViewSet, CommentViewSet, FollowViewSet
+from api.views import CommentViewSet, GroupViewSet, PostViewSet, FollowViewSet
+from rest_framework import routers
 
 
-router = DefaultRouter()
-router.register(r'posts', PostViewSet, basename='posts')
-router.register(r'groups', GroupViewSet, basename='groups')
-router.register('follow', FollowViewSet, basename='followers')
-router.register(r'^posts/(?P<post_pk>\d+)/comments', CommentViewSet,
-                basename='comments'
-                )
+router = routers.DefaultRouter()
+router.register(r'groups', GroupViewSet)
+router.register(r'posts', PostViewSet)
+router.register(r'follow', FollowViewSet)
 
 urlpatterns = [
-    path('v1/', include(router.urls)),
-    path('v1/', include('djoser.urls')),
-    path('v1/', include('djoser.urls.jwt')),
+    path("", include(router.urls)),
+    path(
+        "posts/<int:post_id>/comments/",
+        CommentViewSet.as_view({"get": "list", "post": "create"}),
+        name="post_comments",
+    ),
+    path(
+        "posts/<int:post_id>/comments/<int:pk>/",
+        CommentViewSet.as_view(
+            {"get": "retrieve", "put": "update", "delete": "destroy",
+             "patch": "partial_update"}
+        ),
+        name="post_comment_detail",
+    ),
+    path('', include('djoser.urls')),
+    path('', include('djoser.urls.jwt')),
 ]
