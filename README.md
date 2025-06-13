@@ -39,10 +39,6 @@ python manage.py runserver
     
 # Примеры запросов
 
-```
-http://127.0.0.1:8000/redoc/
-```
-
 Публикация поста
 
 ```
@@ -66,8 +62,3 @@ GET http://127.0.0.1:8000/api/v1/groups/
 GET http://127.0.0.1:8000/api/v1/posts/
 ```
 
-Получение всех комментариев
-
-```
-GET http://127.0.0.1:8000/api/v1/posts/{post_id}/comments/
-```

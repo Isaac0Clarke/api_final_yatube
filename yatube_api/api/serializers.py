@@ -1,8 +1,19 @@
+import base64
+
+from django.core.files.base import ContentFile
 from rest_framework import serializers
 from rest_framework.relations import SlugRelatedField
 
-
 from posts.models import Comment, Post, Group, User, Follow
+
+
+class Base64ImageField(serializers.ImageField):
+    def to_internal_value(self, data):
+        if isinstance(data, str) and data.startswith('data:image'):
+            format, imgstr = data.split(';base64,')
+            ext = format.split('/')[-1]
+            data = ContentFile(base64.b64decode(imgstr), name=f'temp.{ext}')
+        return super().to_internal_value(data)
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -10,88 +21,66 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ("id", "username", "first_name", "last_name", "posts")
-        ref_name = "ReadOnlyUsers"
-
-
-class PostSerializer(serializers.ModelSerializer):
-    author = SlugRelatedField(slug_field='username', read_only=True)
-    group = serializers.PrimaryKeyRelatedField(
-        queryset=Group.objects.all(), required=False
-    )
-    image = serializers.ImageField(required=False)
-    pub_date = serializers.DateTimeField(required=False)
-
-    class Meta:
-        fields = (
-            "id",
-            "text",
-            "author",
-            "image",
-            "group",
-            "pub_date",
-        )
-        read_only_fields = ("author",)
-        model = Post
-
-    def create(self, validated_data):
-        if ("image" not in self.initial_data
-                and "pub_date" not in self.initial_data):
-            post = Post.objects.create(**validated_data)
-            return post
-        else:
-            post = Post.objects.create(**validated_data)
-            return post
-
-
-class CommentSerializer(serializers.ModelSerializer):
-    author = serializers.SlugRelatedField(
-        read_only=True, slug_field='username'
-    )
-    post = serializers.PrimaryKeyRelatedField(read_only=True, required=False)
-    created = serializers.DateTimeField(required=False)
-
-    class Meta:
-        fields = ("id", "author", "post", "text", "created")
-        read_only_fields = ("author", "post")
-        model = Comment
+        fields = '__all__'
 
 
 class GroupSerializer(serializers.ModelSerializer):
-
     class Meta:
         model = Group
-        fields = (
-            "id",
-            "title",
-            "slug",
-            "description",
-        )
+        fields = '__all__'
+
+
+class PostSerializer(serializers.ModelSerializer):
+    image = serializers.ImageField(required=False)
+    group = serializers.PrimaryKeyRelatedField(
+        queryset=Group.objects.all(), required=False
+    )
+    author = SlugRelatedField(read_only=True, slug_field='username')
+    pub_date = serializers.DateTimeField(required=False)
+
+    class Meta:
+        model = Post
+        fields = '__all__'
+        read_only_fields = ('author',)
+
+
+class CommentSerializer(serializers.ModelSerializer):
+    post = serializers.PrimaryKeyRelatedField(read_only=True)
+    author = SlugRelatedField(read_only=True, slug_field='username')
+    created = serializers.DateTimeField(required=False)
+
+    class Meta:
+        model = Comment
+        fields = '__all__'
+        read_only_fields = ('author', 'post')
 
 
 class FollowSerializer(serializers.ModelSerializer):
-    user = serializers.SlugRelatedField(
-        read_only=True, slug_field='username'
-    )
-    following = serializers.SlugRelatedField(
+    following = SlugRelatedField(
         queryset=User.objects.all(),
+        slug_field='username'
+    )
+    user = SlugRelatedField(
+        read_only=True,
         slug_field='username'
     )
 
     class Meta:
-        fields = '__all__'
         model = Follow
+        fields = '__all__'
 
     def validate(self, data):
-        user = self.context['request'].user
-        following = data['following']
+        request_user = self.context['request'].user
+        target_user = data['following']
 
-        if Follow.objects.filter(user=user, following=following).exists():
+        if request_user == target_user:
             raise serializers.ValidationError(
-                'Вы уже подписаны на этого автора.')
+                'Нельзя подписаться на самого себя.'
+            )
 
-        if user == following:
+        if Follow.objects.filter(user=request_user, following=target_user).exists():
             raise serializers.ValidationError(
-                'Нельзя подписаться на самого себя.')
+                'Вы уже подписаны на этого автора.'
+            )
 
         return data
